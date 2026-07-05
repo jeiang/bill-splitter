@@ -20,8 +20,10 @@ const SAMPLE_STATE = {
   ],
 };
 
-const state = cloneState(SAMPLE_STATE);
-let nextId = 4;
+const STORAGE_KEY = "bill-splitter-state-v1";
+const initialState = loadInitialState();
+const state = initialState.state;
+let nextId = initialState.nextId;
 
 const els = {
   peopleBody: document.querySelector("#peopleBody"),
@@ -37,40 +39,52 @@ const els = {
   addFee: document.querySelector("#addFee"),
   resetSample: document.querySelector("#resetSample"),
   clearAll: document.querySelector("#clearAll"),
-  exportReceipts: document.querySelector("#exportReceipts"),
+  exportReceiptPdf: document.querySelector("#exportReceiptPdf"),
+  exportReceiptPng: document.querySelector("#exportReceiptPng"),
   exportPdf: document.querySelector("#exportPdf"),
   exportCsv: document.querySelector("#exportCsv"),
+  receiptRenderRoot: document.querySelector("#receiptRenderRoot"),
 };
 
 els.addPerson.addEventListener("click", () => {
   const person = { id: makeId("person"), name: `Person ${state.people.length + 1}` };
   state.people.push(person);
   state.quantities[person.id] = {};
+  persistState();
   render();
 });
 
 els.addItem.addEventListener("click", () => {
   state.items.push({ id: makeId("item"), name: `Item ${state.items.length + 1}`, price: 0 });
+  persistState();
   render();
 });
 
 els.addFee.addEventListener("click", () => {
   state.fees.push({ id: makeId("fee"), name: `Fee ${state.fees.length + 1}`, amount: 0 });
+  persistState();
   render();
 });
 
 els.resetSample.addEventListener("click", () => {
   replaceState(cloneState(SAMPLE_STATE));
+  nextId = getHighestNumericId(state) + 1;
+  persistState();
   render();
 });
 
 els.clearAll.addEventListener("click", () => {
   replaceState({ people: [], items: [], quantities: {}, fees: [] });
+  persistState();
   render();
 });
 
-els.exportReceipts.addEventListener("click", () => {
-  openPrintableDocument("Mini Receipts", buildReceiptsHtml(getBillSummary()), "receipts");
+els.exportReceiptPdf.addEventListener("click", () => {
+  exportReceiptArchive("pdf");
+});
+
+els.exportReceiptPng.addEventListener("click", () => {
+  exportReceiptArchive("png");
 });
 
 els.exportPdf.addEventListener("click", () => {
@@ -83,6 +97,62 @@ els.exportCsv.addEventListener("click", () => {
 
 function cloneState(source) {
   return JSON.parse(JSON.stringify(source));
+}
+
+function loadInitialState() {
+  const fallback = cloneState(SAMPLE_STATE);
+
+  try {
+    const stored = window.localStorage?.getItem(STORAGE_KEY);
+    if (!stored) {
+      return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+    }
+
+    const parsed = JSON.parse(stored);
+    if (!isValidStoredState(parsed?.state)) {
+      return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+    }
+
+    return {
+      state: parsed.state,
+      nextId: Number.isInteger(parsed.nextId) ? parsed.nextId : getHighestNumericId(parsed.state) + 1,
+    };
+  } catch {
+    return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+  }
+}
+
+function isValidStoredState(candidate) {
+  return Boolean(
+    candidate
+      && Array.isArray(candidate.people)
+      && Array.isArray(candidate.items)
+      && candidate.quantities
+      && typeof candidate.quantities === "object"
+      && !Array.isArray(candidate.quantities)
+      && Array.isArray(candidate.fees),
+  );
+}
+
+function persistState() {
+  try {
+    window.localStorage?.setItem(STORAGE_KEY, JSON.stringify({ state, nextId }));
+  } catch {
+    // Storage can be unavailable in private browsing or restricted embeds.
+  }
+}
+
+function getHighestNumericId(source) {
+  const ids = [
+    ...source.people.map((person) => person.id),
+    ...source.items.map((item) => item.id),
+    ...source.fees.map((fee) => fee.id),
+  ];
+
+  return ids.reduce((highest, id) => {
+    const number = Number(String(id).match(/(\d+)$/)?.[1] ?? 0);
+    return Math.max(highest, number);
+  }, 0);
 }
 
 function replaceState(nextState) {
@@ -129,12 +199,14 @@ function renderPeople() {
     row.append(
       inputCell(person.name, "Person name", (value) => {
         person.name = value;
+        persistState();
         renderResults();
         renderQuantities();
       }),
       removeCell("Remove person", () => {
         state.people = state.people.filter((entry) => entry.id !== person.id);
         delete state.quantities[person.id];
+        persistState();
         render();
       }),
     );
@@ -150,11 +222,13 @@ function renderItems() {
     row.append(
       inputCell(item.name, "Item name", (value) => {
         item.name = value;
+        persistState();
         renderQuantities();
         renderResults();
       }),
       inputCell(item.price, "Unit price", (value) => {
         item.price = cleanNumber(value);
+        persistState();
         renderResults();
       }, "number"),
       removeCell("Remove item", () => {
@@ -162,6 +236,7 @@ function renderItems() {
         Object.values(state.quantities).forEach((personQuantities) => {
           delete personQuantities[item.id];
         });
+        persistState();
         render();
       }),
     );
@@ -177,14 +252,17 @@ function renderFees() {
     row.append(
       inputCell(fee.name, "Fee name", (value) => {
         fee.name = value;
+        persistState();
         renderResults();
       }),
       inputCell(fee.amount, "Fee amount", (value) => {
         fee.amount = cleanNumber(value);
+        persistState();
         renderResults();
       }, "number"),
       removeCell("Remove fee", () => {
         state.fees = state.fees.filter((entry) => entry.id !== fee.id);
+        persistState();
         render();
       }),
     );
@@ -222,6 +300,7 @@ function renderQuantities() {
           state.quantities[person.id] = {};
         }
         state.quantities[person.id][item.id] = cleanNumber(value);
+        persistState();
         renderResults();
       }, "number"));
     });
@@ -481,6 +560,115 @@ function openPrintableDocument(title, bodyHtml, printMode) {
   printWindow.print();
 }
 
+async function exportReceiptArchive(format) {
+  const summary = getBillSummary();
+  if (summary.people.length === 0) {
+    window.alert("Add at least one person before exporting receipts.");
+    return;
+  }
+
+  if (!hasReceiptExportDependencies(format)) {
+    window.alert("Receipt export libraries are still loading. Try again in a moment.");
+    return;
+  }
+
+  const zip = new JSZip();
+  const usedNames = new Map();
+
+  try {
+    for (const person of summary.people) {
+      const receipt = buildReceiptNode(person, summary.fees);
+      els.receiptRenderRoot.replaceChildren(receipt);
+      const pngDataUrl = await htmlToImage.toPng(receipt, {
+        backgroundColor: "#ffffff",
+        cacheBust: true,
+        pixelRatio: 2,
+      });
+      const baseName = uniqueReceiptName(person.name, usedNames);
+
+      if (format === "png") {
+        zip.file(`${baseName}.png`, dataUrlToBase64(pngDataUrl), { base64: true });
+      } else {
+        const pdfBytes = createReceiptPdf(receipt, pngDataUrl);
+        zip.file(`${baseName}.pdf`, pdfBytes);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(zipBlob, `bill-receipts-${format}-${new Date().toISOString().slice(0, 10)}.zip`);
+  } catch (error) {
+    console.error(error);
+    window.alert("Could not generate receipt files. Check the browser console for details.");
+  } finally {
+    els.receiptRenderRoot.replaceChildren();
+  }
+}
+
+function hasReceiptExportDependencies(format) {
+  const hasZipAndImage = typeof JSZip !== "undefined" && typeof htmlToImage !== "undefined";
+  if (format === "png") {
+    return hasZipAndImage;
+  }
+
+  return hasZipAndImage && Boolean(window.jspdf?.jsPDF);
+}
+
+function buildReceiptNode(person, fees) {
+  const receipt = document.createElement("article");
+  receipt.className = "receipt-export-card";
+  receipt.innerHTML = `
+    <h2>${escapeHtml(person.name)}</h2>
+    ${buildPersonItemsTable(person)}
+    ${buildPersonFeesTable(person, fees)}
+    <p class="receipt-total"><span>Total due</span><strong>${formatMoney(person.total)}</strong></p>
+  `;
+  return receipt;
+}
+
+function createReceiptPdf(receipt, pngDataUrl) {
+  const { jsPDF } = window.jspdf;
+  const width = Math.ceil(receipt.offsetWidth);
+  const height = Math.ceil(receipt.offsetHeight);
+  const pdf = new jsPDF({
+    unit: "px",
+    format: [width, height],
+    orientation: height >= width ? "portrait" : "landscape",
+  });
+  pdf.addImage(pngDataUrl, "PNG", 0, 0, width, height);
+  return pdf.output("arraybuffer");
+}
+
+function dataUrlToBase64(dataUrl) {
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
+}
+
+function uniqueReceiptName(name, usedNames) {
+  const slug = slugify(name || "receipt");
+  const count = (usedNames.get(slug) ?? 0) + 1;
+  usedNames.set(slug, count);
+  return count === 1 ? `${slug}-receipt` : `${slug}-receipt-${count}`;
+}
+
+function slugify(value) {
+  const slug = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "receipt";
+}
+
+function downloadBlob(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 function downloadSpreadsheet(summary) {
   const feeHeaders = summary.fees.map((fee) => `<th>${escapeHtml(fee.name)}</th>`).join("");
   const summaryRows = summary.people.map((person) => `
@@ -532,14 +720,7 @@ function downloadSpreadsheet(summary) {
     </html>`;
 
   const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = `bill-split-${new Date().toISOString().slice(0, 10)}.xls`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  downloadBlob(blob, `bill-split-${new Date().toISOString().slice(0, 10)}.xls`);
 }
 
 function printStyles() {

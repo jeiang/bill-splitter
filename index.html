@@ -104,14 +104,19 @@
             <p class="section-note">Create receipts, print a PDF, or download the bill as a spreadsheet.</p>
           </div>
           <div class="export-actions" aria-label="Export actions">
-            <button id="exportReceipts" class="button secondary" type="button">Mini receipts</button>
+            <button id="exportReceiptPdf" class="button secondary" type="button">Receipts (PDF)</button>
+            <button id="exportReceiptPng" class="button secondary" type="button">Receipts (PNG)</button>
             <button id="exportPdf" class="button secondary" type="button">PDF breakdown</button>
             <button id="exportCsv" class="button" type="button">Excel spreadsheet</button>
           </div>
         </div>
       </section>
+      <div id="receiptRenderRoot" class="receipt-render-root" aria-hidden="true"></div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
