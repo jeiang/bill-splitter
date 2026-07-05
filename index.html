@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bill Splitter</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Bill Splitter</p>
+          <h1>Split itemized bills by what each person took.</h1>
+        </div>
+        <div class="header-actions" aria-label="Bill actions">
+          <button id="resetSample" class="button secondary" type="button">Reset sample</button>
+          <button id="clearAll" class="button danger" type="button">Clear all</button>
+        </div>
+      </header>
+
+      <section class="panel" aria-labelledby="people-title">
+        <div class="section-heading">
+          <h2 id="people-title">People</h2>
+          <button id="addPerson" class="button" type="button">Add person</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th class="action-col" scope="col">Remove</th>
+              </tr>
+            </thead>
+            <tbody id="peopleBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="items-title">
+        <div class="section-heading">
+          <h2 id="items-title">Items</h2>
+          <button id="addItem" class="button" type="button">Add item</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col">Unit price</th>
+                <th class="action-col" scope="col">Remove</th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide" aria-labelledby="quantities-title">
+        <div class="section-heading">
+          <h2 id="quantities-title">Who Took What</h2>
+        </div>
+        <div id="quantityEmpty" class="empty-state" hidden>Add at least one person and one item.</div>
+        <div class="table-wrap">
+          <table id="quantityTable"></table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="fees-title">
+        <div class="section-heading">
+          <h2 id="fees-title">Final Fees</h2>
+          <button id="addFee" class="button" type="button">Add fee</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Fee</th>
+                <th scope="col">Amount</th>
+                <th class="action-col" scope="col">Remove</th>
+              </tr>
+            </thead>
+            <tbody id="feesBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide results-panel" aria-labelledby="results-title">
+        <div class="section-heading">
+          <h2 id="results-title">Results</h2>
+          <p id="grandTotal" class="total-pill">$0.00</p>
+        </div>
+        <div id="resultsEmpty" class="empty-state" hidden>No purchases to split yet.</div>
+        <div class="table-wrap">
+          <table id="resultsTable"></table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
