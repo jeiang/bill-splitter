@@ -37,6 +37,9 @@ const els = {
   addFee: document.querySelector("#addFee"),
   resetSample: document.querySelector("#resetSample"),
   clearAll: document.querySelector("#clearAll"),
+  exportReceipts: document.querySelector("#exportReceipts"),
+  exportPdf: document.querySelector("#exportPdf"),
+  exportCsv: document.querySelector("#exportCsv"),
 };
 
 els.addPerson.addEventListener("click", () => {
@@ -64,6 +67,18 @@ els.resetSample.addEventListener("click", () => {
 els.clearAll.addEventListener("click", () => {
   replaceState({ people: [], items: [], quantities: {}, fees: [] });
   render();
+});
+
+els.exportReceipts.addEventListener("click", () => {
+  openPrintableDocument("Mini Receipts", buildReceiptsHtml(getBillSummary()), "receipts");
+});
+
+els.exportPdf.addEventListener("click", () => {
+  openPrintableDocument("Bill Breakdown", buildBreakdownHtml(getBillSummary()), "breakdown");
+});
+
+els.exportCsv.addEventListener("click", () => {
+  downloadSpreadsheet(getBillSummary());
 });
 
 function cloneState(source) {
@@ -219,23 +234,9 @@ function renderQuantities() {
 
 function renderResults() {
   els.resultsTable.replaceChildren();
+  const summary = getBillSummary();
 
-  const subtotalRows = state.people.map((person) => {
-    const subtotal = state.items.reduce((sum, item) => {
-      const quantity = state.quantities[person.id]?.[item.id] ?? 0;
-      return sum + toCents(quantity * cleanNumber(item.price));
-    }, 0);
-    return { person, subtotal };
-  });
-
-  const purchaseTotal = subtotalRows.reduce((sum, row) => sum + row.subtotal, 0);
-  const allocationsByFee = state.fees.map((fee) => ({
-    fee,
-    allocations: allocateFee(toCents(fee.amount), subtotalRows.map((row) => row.subtotal), purchaseTotal),
-  }));
-  const feeTotal = state.fees.reduce((sum, fee) => sum + toCents(fee.amount), 0);
-
-  els.grandTotal.textContent = formatMoney(purchaseTotal + (purchaseTotal > 0 ? feeTotal : 0));
+  els.grandTotal.textContent = formatMoney(summary.grandTotal);
   els.resultsEmpty.hidden = state.people.length > 0;
 
   if (state.people.length === 0) {
@@ -245,32 +246,80 @@ function renderResults() {
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   headRow.append(headerCell("Person"), headerCell("Subtotal", "numeric"));
-  state.fees.forEach((fee) => headRow.append(headerCell(fee.name || "Untitled fee", "numeric")));
+  summary.fees.forEach((fee) => headRow.append(headerCell(fee.name, "numeric")));
   headRow.append(headerCell("Final total", "numeric"));
   thead.append(headRow);
 
   const tbody = document.createElement("tbody");
-  subtotalRows.forEach((row, personIndex) => {
+  summary.people.forEach((row) => {
     const tr = document.createElement("tr");
     const personCell = document.createElement("td");
     personCell.className = "person-col";
-    personCell.textContent = row.person.name || "Untitled person";
+    personCell.textContent = row.name;
     tr.append(personCell, moneyCell(row.subtotal));
 
-    let finalTotal = row.subtotal;
-    allocationsByFee.forEach(({ allocations }) => {
-      const allocation = allocations[personIndex] ?? 0;
-      finalTotal += allocation;
+    row.fees.forEach((allocation) => {
       tr.append(moneyCell(allocation));
     });
 
-    const totalCell = moneyCell(finalTotal);
+    const totalCell = moneyCell(row.total);
     totalCell.classList.add("final-total");
     tr.append(totalCell);
     tbody.append(tr);
   });
 
   els.resultsTable.append(thead, tbody);
+}
+
+function getBillSummary() {
+  const people = state.people.map((person) => {
+    const purchasedItems = state.items.map((item) => {
+      const quantity = cleanNumber(state.quantities[person.id]?.[item.id] ?? 0);
+      const unitPrice = toCents(item.price);
+      const total = Math.round(quantity * unitPrice);
+      return {
+        name: item.name || "Untitled item",
+        quantity,
+        unitPrice,
+        total,
+      };
+    }).filter((item) => item.quantity > 0 || item.total > 0);
+
+    const subtotal = purchasedItems.reduce((sum, item) => sum + item.total, 0);
+    return {
+      id: person.id,
+      name: person.name || "Untitled person",
+      items: purchasedItems,
+      subtotal,
+      fees: [],
+      total: subtotal,
+    };
+  });
+
+  const purchaseTotal = people.reduce((sum, person) => sum + person.subtotal, 0);
+  const fees = state.fees.map((fee) => {
+    const amount = toCents(fee.amount);
+    const allocations = allocateFee(amount, people.map((person) => person.subtotal), purchaseTotal);
+    allocations.forEach((allocation, index) => {
+      people[index].fees.push(allocation);
+      people[index].total += allocation;
+    });
+    return {
+      name: fee.name || "Untitled fee",
+      amount,
+      allocations,
+    };
+  });
+
+  const feeTotal = purchaseTotal > 0 ? fees.reduce((sum, fee) => sum + fee.amount, 0) : 0;
+
+  return {
+    people,
+    fees,
+    purchaseTotal,
+    feeTotal,
+    grandTotal: purchaseTotal + feeTotal,
+  };
 }
 
 function allocateFee(feeCents, subtotals, total) {
@@ -302,6 +351,296 @@ function allocateFee(feeCents, subtotals, total) {
     });
 
   return result;
+}
+
+function buildReceiptsHtml(summary) {
+  const receipts = summary.people.map((person) => `
+    <article class="receipt-card">
+      <h2>${escapeHtml(person.name)}</h2>
+      ${buildPersonItemsTable(person)}
+      ${buildPersonFeesTable(person, summary.fees)}
+      <p class="receipt-total"><span>Total due</span><strong>${formatMoney(person.total)}</strong></p>
+    </article>
+  `).join("");
+
+  return `${printStyles()}
+    <main class="receipt-grid">
+      <header class="print-header">
+        <h1>Mini Receipts</h1>
+        <p>Total bill: ${formatMoney(summary.grandTotal)}</p>
+      </header>
+      ${receipts || "<p>No people have been added.</p>"}
+    </main>`;
+}
+
+function buildBreakdownHtml(summary) {
+  const feeHeaders = summary.fees.map((fee) => `<th>${escapeHtml(fee.name)}</th>`).join("");
+  const personRows = summary.people.map((person) => `
+    <tr>
+      <td>${escapeHtml(person.name)}</td>
+      <td>${formatMoney(person.subtotal)}</td>
+      ${person.fees.map((fee) => `<td>${formatMoney(fee)}</td>`).join("")}
+      <td>${formatMoney(person.total)}</td>
+    </tr>
+  `).join("");
+
+  const itemRows = summary.people.map((person) => person.items.map((item) => `
+    <tr>
+      <td>${escapeHtml(person.name)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${formatQuantity(item.quantity)}</td>
+      <td>${formatMoney(item.unitPrice)}</td>
+      <td>${formatMoney(item.total)}</td>
+    </tr>
+  `).join("")).join("");
+
+  return `${printStyles()}
+    <main>
+      <header class="print-header">
+        <h1>Bill Breakdown</h1>
+        <p>Subtotal: ${formatMoney(summary.purchaseTotal)} | Final fees: ${formatMoney(summary.feeTotal)} | Total: ${formatMoney(summary.grandTotal)}</p>
+      </header>
+      <section>
+        <h2>Totals by Person</h2>
+        <table>
+          <thead>
+            <tr><th>Person</th><th>Subtotal</th>${feeHeaders}<th>Final total</th></tr>
+          </thead>
+          <tbody>${personRows || '<tr><td colspan="4">No people have been added.</td></tr>'}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Items</h2>
+        <table>
+          <thead>
+            <tr><th>Person</th><th>Item</th><th>Quantity</th><th>Unit price</th><th>Line total</th></tr>
+          </thead>
+          <tbody>${itemRows || '<tr><td colspan="5">No purchased items.</td></tr>'}</tbody>
+        </table>
+      </section>
+    </main>`;
+}
+
+function buildPersonItemsTable(person) {
+  const rows = person.items.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${formatQuantity(item.quantity)}</td>
+      <td>${formatMoney(item.unitPrice)}</td>
+      <td>${formatMoney(item.total)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Total</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4">No items</td></tr>'}</tbody>
+      <tfoot><tr><th colspan="3">Subtotal</th><td>${formatMoney(person.subtotal)}</td></tr></tfoot>
+    </table>`;
+}
+
+function buildPersonFeesTable(person, fees) {
+  const rows = fees.map((fee, index) => `
+    <tr>
+      <td>${escapeHtml(fee.name)}</td>
+      <td>${formatMoney(person.fees[index] ?? 0)}</td>
+    </tr>
+  `).join("");
+
+  if (!rows) {
+    return "";
+  }
+
+  return `
+    <table>
+      <thead><tr><th>Final fee</th><th>Share</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function openPrintableDocument(title, bodyHtml, printMode) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    window.alert("Allow pop-ups to open the printable export.");
+    return;
+  }
+
+  printWindow.document.write(`<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>${escapeHtml(title)}</title>
+      </head>
+      <body data-print-mode="${printMode}">
+        ${bodyHtml}
+      </body>
+    </html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function downloadSpreadsheet(summary) {
+  const feeHeaders = summary.fees.map((fee) => `<th>${escapeHtml(fee.name)}</th>`).join("");
+  const summaryRows = summary.people.map((person) => `
+    <tr>
+      <td>${escapeHtml(person.name)}</td>
+      <td>${centsToDecimal(person.subtotal)}</td>
+      ${person.fees.map((fee) => `<td>${centsToDecimal(fee)}</td>`).join("")}
+      <td>${centsToDecimal(person.total)}</td>
+    </tr>
+  `).join("");
+
+  const itemRows = summary.people.map((person) => {
+    const items = person.items.length > 0 ? person.items : [{ name: "", quantity: "", unitPrice: 0, total: 0 }];
+    return items.map((item) => `
+      <tr>
+        <td>${escapeHtml(person.name)}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td>${escapeHtml(item.quantity)}</td>
+        <td>${centsToDecimal(item.unitPrice)}</td>
+        <td>${centsToDecimal(item.total)}</td>
+      </tr>
+    `).join("");
+  }).join("");
+
+  const workbook = `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; margin-bottom: 24px; }
+          th, td { border: 1px solid #999; padding: 6px 8px; }
+          th { background: #f2f2f2; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <h1>Bill Split</h1>
+        <table>
+          <thead><tr><th>Person</th><th>Subtotal</th>${feeHeaders}<th>Final Total</th></tr></thead>
+          <tbody>${summaryRows}</tbody>
+          <tfoot>
+            <tr><th>Totals</th><td>${centsToDecimal(summary.purchaseTotal)}</td>${summary.fees.map((fee) => `<td>${centsToDecimal(fee.amount)}</td>`).join("")}<td>${centsToDecimal(summary.grandTotal)}</td></tr>
+          </tfoot>
+        </table>
+        <table>
+          <thead><tr><th>Person</th><th>Item</th><th>Quantity</th><th>Unit Price</th><th>Line Total</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+      </body>
+    </html>`;
+
+  const blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = `bill-split-${new Date().toISOString().slice(0, 10)}.xls`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+function printStyles() {
+  return `<style>
+    body {
+      margin: 0;
+      color: #202124;
+      font-family: Arial, sans-serif;
+      line-height: 1.35;
+    }
+    main {
+      padding: 24px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    section {
+      margin-top: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+    }
+    th,
+    td {
+      padding: 8px;
+      border: 1px solid #d8d1c7;
+      text-align: left;
+    }
+    th {
+      background: #f6f3ee;
+    }
+    td:last-child,
+    th:last-child {
+      text-align: right;
+    }
+    .print-header {
+      margin-bottom: 22px;
+      border-bottom: 2px solid #202124;
+      padding-bottom: 12px;
+    }
+    .print-header p {
+      margin: 8px 0 0;
+    }
+    .receipt-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .receipt-grid .print-header {
+      grid-column: 1 / -1;
+    }
+    .receipt-card {
+      break-inside: avoid;
+      border: 1px solid #d8d1c7;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .receipt-total {
+      display: flex;
+      justify-content: space-between;
+      margin: 12px 0 0;
+      font-size: 18px;
+    }
+    @media print {
+      main {
+        padding: 0;
+      }
+      .receipt-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 760px) {
+      .receipt-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>`;
+}
+
+function formatQuantity(quantity) {
+  return Number.isInteger(quantity) ? String(quantity) : String(Number(quantity.toFixed(2)));
+}
+
+function centsToDecimal(cents) {
+  return (cents / 100).toFixed(2);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function inputCell(value, label, onInput, type = "text") {

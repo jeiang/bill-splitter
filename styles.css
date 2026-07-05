@@ -88,6 +88,23 @@ h2 {
   justify-content: flex-end;
 }
 
+.export-heading {
+  align-items: center;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.section-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
 .panel {
   min-width: 0;
   padding: 18px;
@@ -259,5 +276,10 @@ input[type="number"] {
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .export-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
