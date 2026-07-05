@@ -1,0 +1,33 @@
+# Bill Splitter
+
+Bill Splitter is a static browser app for splitting itemized bills by person, then allocating final fees proportionally.
+
+Primary automation entrypoint:
+- `window.BillSplitterHarness`
+
+Machine-readable context:
+- `/ai-context.json`
+- In-page JSON metadata: `#automation-metadata`
+
+Human automation guide:
+- `/AUTOMATION.md`
+
+Repository maintenance instructions:
+- `/AGENTS.md`
+
+Stable selector strategy:
+- Prefer `[data-testid="..."]` selectors over visual text or DOM position.
+- Dynamic rows expose entity IDs using `data-person-id`, `data-item-id`, and `data-fee-id`.
+- Results cells expose `data-result-column` values such as `subtotal`, `fee`, `final-total`, `subtotal-total`, `fee-total`, and `grand-total`.
+
+Important storage keys:
+- Saved bill library: `bill-splitter-library-v2`
+- Legacy single bill state: `bill-splitter-state-v1`
+
+Core harness workflow:
+1. Use `BillSplitterHarness.setActiveBillState(state)` or batch helpers to set up data.
+2. Use `BillSplitterHarness.getSummary()` to read cents-based totals.
+3. Use stable selectors only when validating visible UI or clicking export buttons.
+
+The state shape is:
+`{ people: [{ id, name }], items: [{ id, name, price }], quantities: { [personId]: { [itemId]: quantity } }, fees: [{ id, name, amount }] }`

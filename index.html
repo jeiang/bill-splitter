@@ -5,55 +5,111 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Bill Splitter</title>
     <link rel="icon" href="data:,">
+    <link rel="llms.txt" href="llms.txt">
+    <link rel="ai-context" type="application/json" href="ai-context.json">
     <link rel="stylesheet" href="styles.css">
+    <script type="application/json" id="automation-metadata">
+      {
+        "appName": "Bill Splitter",
+        "automationVersion": "1.0.0",
+        "storageKeys": {
+          "library": "bill-splitter-library-v2",
+          "legacyState": "bill-splitter-state-v1"
+        },
+        "contextFiles": {
+          "llms": "llms.txt",
+          "aiContext": "ai-context.json",
+          "automationGuide": "AUTOMATION.md",
+          "agentInstructions": "AGENTS.md"
+        },
+        "harnessGlobal": "BillSplitterHarness",
+        "harnessMethods": [
+          "getState",
+          "getLibrary",
+          "getSummary",
+          "getMetadata",
+          "setActiveBillState",
+          "resetSample",
+          "clearActiveBill",
+          "createBill",
+          "switchBill",
+          "renameActiveBill",
+          "deleteActiveBill",
+          "addPeople",
+          "addItems",
+          "setQuantity",
+          "setFee"
+        ],
+        "testIds": {
+          "billSelector": "bill-selector",
+          "billNameInput": "bill-name-input",
+          "peopleTable": "people-table",
+          "itemsTable": "items-table",
+          "quantityTable": "quantity-table",
+          "feesTable": "fees-table",
+          "resultsTable": "results-table",
+          "personRow": "person-row",
+          "itemRow": "item-row",
+          "feeRow": "fee-row",
+          "quantityInput": "quantity-input",
+          "resultCell": "result-cell",
+          "resultsTotalRow": "results-total-row",
+          "exportBills": "export-bills",
+          "exportReceiptsPdf": "export-receipts-pdf",
+          "exportReceiptsPng": "export-receipts-png",
+          "exportBreakdownPdf": "export-breakdown-pdf",
+          "exportSpreadsheet": "export-spreadsheet"
+        }
+      }
+    </script>
   </head>
   <body>
-    <main class="app-shell">
-      <header class="app-header">
+    <main class="app-shell" data-testid="app-shell">
+      <header class="app-header" data-testid="app-header">
         <div>
           <p class="eyebrow">Bill Splitter</p>
           <h1>Split itemized bills by what each person took.</h1>
         </div>
         <div class="header-actions" aria-label="Bill actions">
-          <button id="resetSample" class="button secondary" type="button">Reset sample</button>
-          <button id="clearAll" class="button danger" type="button">Clear all</button>
+          <button id="resetSample" class="button secondary" type="button" data-testid="reset-sample">Reset sample</button>
+          <button id="clearAll" class="button danger" type="button" data-testid="clear-active-bill">Clear all</button>
         </div>
       </header>
 
-      <section class="panel wide" aria-labelledby="bill-library-title">
+      <section class="panel wide" aria-labelledby="bill-library-title" data-testid="bill-library-panel">
         <div class="section-heading export-heading">
           <div>
             <h2 id="bill-library-title">Saved Bills</h2>
             <p class="section-note">Name, switch, back up, and restore locally saved bills.</p>
           </div>
           <div class="bill-actions" aria-label="Saved bill actions">
-            <button id="newBill" class="button secondary" type="button">New bill</button>
-            <button id="duplicateBill" class="button secondary" type="button">Duplicate</button>
-            <button id="deleteBill" class="button danger" type="button">Delete</button>
-            <button id="exportBills" class="button secondary" type="button">Export bills</button>
-            <button id="importBills" class="button" type="button">Import bills</button>
-            <input id="importBillsFile" type="file" accept="application/json,.json" hidden>
+            <button id="newBill" class="button secondary" type="button" data-testid="new-bill">New bill</button>
+            <button id="duplicateBill" class="button secondary" type="button" data-testid="duplicate-bill">Duplicate</button>
+            <button id="deleteBill" class="button danger" type="button" data-testid="delete-bill">Delete</button>
+            <button id="exportBills" class="button secondary" type="button" data-testid="export-bills">Export bills</button>
+            <button id="importBills" class="button" type="button" data-testid="import-bills">Import bills</button>
+            <input id="importBillsFile" type="file" accept="application/json,.json" data-testid="import-bills-file" hidden>
           </div>
         </div>
         <div class="bill-fields">
           <label>
             <span>Current bill</span>
-            <select id="billSelector"></select>
+            <select id="billSelector" data-testid="bill-selector"></select>
           </label>
           <label>
             <span>Bill name</span>
-            <input id="billName" type="text" autocomplete="off">
+            <input id="billName" type="text" autocomplete="off" data-testid="bill-name-input">
           </label>
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="people-title">
+      <section class="panel" aria-labelledby="people-title" data-testid="people-panel">
         <div class="section-heading">
           <h2 id="people-title">People</h2>
-          <button id="addPerson" class="button" type="button">Add person</button>
+          <button id="addPerson" class="button" type="button" data-testid="add-person">Add person</button>
         </div>
         <div class="table-wrap">
-          <table>
+          <table data-testid="people-table">
             <thead>
               <tr>
                 <th scope="col">Name</th>
@@ -65,18 +121,18 @@
         </div>
         <div class="batch-entry">
           <label for="batchPeople">Batch add people</label>
-          <textarea id="batchPeople" rows="3" placeholder="Alice, Bob, Carter"></textarea>
-          <button id="addBatchPeople" class="button secondary" type="button">Add batch</button>
+          <textarea id="batchPeople" rows="3" placeholder="Alice, Bob, Carter" data-testid="batch-people-input"></textarea>
+          <button id="addBatchPeople" class="button secondary" type="button" data-testid="add-batch-people">Add batch</button>
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="items-title">
+      <section class="panel" aria-labelledby="items-title" data-testid="items-panel">
         <div class="section-heading">
           <h2 id="items-title">Items</h2>
-          <button id="addItem" class="button" type="button">Add item</button>
+          <button id="addItem" class="button" type="button" data-testid="add-item">Add item</button>
         </div>
         <div class="table-wrap">
-          <table>
+          <table data-testid="items-table">
             <thead>
               <tr>
                 <th scope="col">Item</th>
@@ -89,28 +145,28 @@
         </div>
         <div class="batch-entry">
           <label for="batchItems">Batch add items</label>
-          <textarea id="batchItems" rows="3" placeholder="Burger,30&#10;Coke,10"></textarea>
-          <button id="addBatchItems" class="button secondary" type="button">Add batch</button>
+          <textarea id="batchItems" rows="3" placeholder="Burger,30&#10;Coke,10" data-testid="batch-items-input"></textarea>
+          <button id="addBatchItems" class="button secondary" type="button" data-testid="add-batch-items">Add batch</button>
         </div>
       </section>
 
-      <section class="panel wide" aria-labelledby="quantities-title">
+      <section class="panel wide" aria-labelledby="quantities-title" data-testid="quantities-panel">
         <div class="section-heading">
           <h2 id="quantities-title">Who Took What</h2>
         </div>
-        <div id="quantityEmpty" class="empty-state" hidden>Add at least one person and one item.</div>
+        <div id="quantityEmpty" class="empty-state" data-testid="quantity-empty" hidden>Add at least one person and one item.</div>
         <div class="table-wrap">
-          <table id="quantityTable"></table>
+          <table id="quantityTable" data-testid="quantity-table"></table>
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="fees-title">
+      <section class="panel" aria-labelledby="fees-title" data-testid="fees-panel">
         <div class="section-heading">
           <h2 id="fees-title">Final Fees</h2>
-          <button id="addFee" class="button" type="button">Add fee</button>
+          <button id="addFee" class="button" type="button" data-testid="add-fee">Add fee</button>
         </div>
         <div class="table-wrap">
-          <table>
+          <table data-testid="fees-table">
             <thead>
               <tr>
                 <th scope="col">Fee</th>
@@ -123,32 +179,32 @@
         </div>
       </section>
 
-      <section class="panel wide results-panel" aria-labelledby="results-title">
+      <section class="panel wide results-panel" aria-labelledby="results-title" data-testid="results-panel">
         <div class="section-heading">
           <h2 id="results-title">Results</h2>
-          <p id="grandTotal" class="total-pill">$0.00</p>
+          <p id="grandTotal" class="total-pill" data-testid="grand-total">$0.00</p>
         </div>
-        <div id="resultsEmpty" class="empty-state" hidden>No purchases to split yet.</div>
+        <div id="resultsEmpty" class="empty-state" data-testid="results-empty" hidden>No purchases to split yet.</div>
         <div class="table-wrap">
-          <table id="resultsTable"></table>
+          <table id="resultsTable" data-testid="results-table"></table>
         </div>
       </section>
 
-      <section class="panel wide" aria-labelledby="exports-title">
+      <section class="panel wide" aria-labelledby="exports-title" data-testid="exports-panel">
         <div class="section-heading export-heading">
           <div>
             <h2 id="exports-title">Exports</h2>
             <p class="section-note">Create receipts, print a PDF, or download the bill as a spreadsheet.</p>
           </div>
           <div class="export-actions" aria-label="Export actions">
-            <button id="exportReceiptPdf" class="button secondary" type="button">Receipts (PDF)</button>
-            <button id="exportReceiptPng" class="button secondary" type="button">Receipts (PNG)</button>
-            <button id="exportPdf" class="button secondary" type="button">PDF breakdown</button>
-            <button id="exportCsv" class="button" type="button">Excel spreadsheet</button>
+            <button id="exportReceiptPdf" class="button secondary" type="button" data-testid="export-receipts-pdf">Receipts (PDF)</button>
+            <button id="exportReceiptPng" class="button secondary" type="button" data-testid="export-receipts-png">Receipts (PNG)</button>
+            <button id="exportPdf" class="button secondary" type="button" data-testid="export-breakdown-pdf">PDF breakdown</button>
+            <button id="exportCsv" class="button" type="button" data-testid="export-spreadsheet">Excel spreadsheet</button>
           </div>
         </div>
       </section>
-      <div id="receiptRenderRoot" class="receipt-render-root" aria-hidden="true"></div>
+      <div id="receiptRenderRoot" class="receipt-render-root" data-testid="receipt-render-root" aria-hidden="true"></div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>

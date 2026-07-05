@@ -479,19 +479,21 @@ function renderPeople() {
 
   state.people.forEach((person) => {
     const row = document.createElement("tr");
+    row.dataset.testid = "person-row";
+    row.dataset.personId = person.id;
     row.append(
       inputCell(person.name, "Person name", (value) => {
         person.name = value;
         persistState();
         renderResults();
         renderQuantities();
-      }),
+      }, "text", { testid: "person-name-input", personId: person.id }),
       removeCell("Remove person", () => {
         state.people = state.people.filter((entry) => entry.id !== person.id);
         delete state.quantities[person.id];
         persistState();
         render();
-      }),
+      }, { testid: "remove-person", personId: person.id }),
     );
     els.peopleBody.append(row);
   });
@@ -502,18 +504,20 @@ function renderItems() {
 
   state.items.forEach((item) => {
     const row = document.createElement("tr");
+    row.dataset.testid = "item-row";
+    row.dataset.itemId = item.id;
     row.append(
       inputCell(item.name, "Item name", (value) => {
         item.name = value;
         persistState();
         renderQuantities();
         renderResults();
-      }),
+      }, "text", { testid: "item-name-input", itemId: item.id }),
       inputCell(item.price, "Unit price", (value) => {
         item.price = cleanNumber(value);
         persistState();
         renderResults();
-      }, "number"),
+      }, "number", { testid: "item-price-input", itemId: item.id }),
       removeCell("Remove item", () => {
         state.items = state.items.filter((entry) => entry.id !== item.id);
         Object.values(state.quantities).forEach((personQuantities) => {
@@ -521,7 +525,7 @@ function renderItems() {
         });
         persistState();
         render();
-      }),
+      }, { testid: "remove-item", itemId: item.id }),
     );
     els.itemsBody.append(row);
   });
@@ -532,22 +536,24 @@ function renderFees() {
 
   state.fees.forEach((fee) => {
     const row = document.createElement("tr");
+    row.dataset.testid = "fee-row";
+    row.dataset.feeId = fee.id;
     row.append(
       inputCell(fee.name, "Fee name", (value) => {
         fee.name = value;
         persistState();
         renderResults();
-      }),
+      }, "text", { testid: "fee-name-input", feeId: fee.id }),
       inputCell(fee.amount, "Fee amount", (value) => {
         fee.amount = cleanNumber(value);
         persistState();
         renderResults();
-      }, "number"),
+      }, "number", { testid: "fee-amount-input", feeId: fee.id }),
       removeCell("Remove fee", () => {
         state.fees = state.fees.filter((entry) => entry.id !== fee.id);
         persistState();
         render();
-      }),
+      }, { testid: "remove-fee", feeId: fee.id }),
     );
     els.feesBody.append(row);
   });
@@ -571,8 +577,12 @@ function renderQuantities() {
   const tbody = document.createElement("tbody");
   state.people.forEach((person) => {
     const row = document.createElement("tr");
+    row.dataset.testid = "quantity-row";
+    row.dataset.personId = person.id;
     const nameCell = document.createElement("td");
     nameCell.className = "person-col";
+    nameCell.dataset.testid = "quantity-person-cell";
+    nameCell.dataset.personId = person.id;
     nameCell.textContent = person.name || "Untitled person";
     row.append(nameCell);
 
@@ -585,7 +595,11 @@ function renderQuantities() {
         state.quantities[person.id][item.id] = cleanNumber(value);
         persistState();
         renderResults();
-      }, "number"));
+      }, "number", {
+        testid: "quantity-input",
+        personId: person.id,
+        itemId: item.id,
+      }));
     });
 
     tbody.append(row);
@@ -615,16 +629,25 @@ function renderResults() {
   const tbody = document.createElement("tbody");
   summary.people.forEach((row) => {
     const tr = document.createElement("tr");
+    tr.dataset.testid = "result-row";
+    tr.dataset.personId = row.id;
     const personCell = document.createElement("td");
     personCell.className = "person-col";
+    personCell.dataset.testid = "result-person-cell";
+    personCell.dataset.personId = row.id;
     personCell.textContent = row.name;
-    tr.append(personCell, moneyCell(row.subtotal));
+    tr.append(personCell, moneyCell(row.subtotal, { testid: "result-cell", personId: row.id, resultColumn: "subtotal" }));
 
-    row.fees.forEach((allocation) => {
-      tr.append(moneyCell(allocation));
+    row.fees.forEach((allocation, feeIndex) => {
+      tr.append(moneyCell(allocation, {
+        testid: "result-cell",
+        personId: row.id,
+        feeId: state.fees[feeIndex]?.id ?? "",
+        resultColumn: "fee",
+      }));
     });
 
-    const totalCell = moneyCell(row.total);
+    const totalCell = moneyCell(row.total, { testid: "result-cell", personId: row.id, resultColumn: "final-total" });
     totalCell.classList.add("final-total");
     tr.append(totalCell);
     tbody.append(tr);
@@ -632,12 +655,18 @@ function renderResults() {
 
   const tfoot = document.createElement("tfoot");
   const totalsRow = document.createElement("tr");
+  totalsRow.dataset.testid = "results-total-row";
   const totalsLabel = document.createElement("th");
   totalsLabel.scope = "row";
   totalsLabel.textContent = "Totals";
-  totalsRow.append(totalsLabel, moneyCell(summary.purchaseTotal));
-  summary.fees.forEach((fee) => totalsRow.append(moneyCell(fee.amount)));
-  const grandTotalCell = moneyCell(summary.grandTotal);
+  totalsLabel.dataset.testid = "results-total-label";
+  totalsRow.append(totalsLabel, moneyCell(summary.purchaseTotal, { testid: "result-cell", resultColumn: "subtotal-total" }));
+  summary.fees.forEach((fee, feeIndex) => totalsRow.append(moneyCell(fee.amount, {
+    testid: "result-cell",
+    feeId: state.fees[feeIndex]?.id ?? "",
+    resultColumn: "fee-total",
+  })));
+  const grandTotalCell = moneyCell(summary.grandTotal, { testid: "result-cell", resultColumn: "grand-total" });
   grandTotalCell.classList.add("final-total");
   totalsRow.append(grandTotalCell);
   tfoot.append(totalsRow);
@@ -1119,12 +1148,31 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function inputCell(value, label, onInput, type = "text") {
+function applyDataset(element, attributes = {}) {
+  Object.entries(attributes).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (key === "testid") {
+      element.dataset.testid = value;
+      return;
+    }
+
+    element.dataset[key] = String(value);
+  });
+}
+
+function inputCell(value, label, onInput, type = "text", attributes = {}) {
   const cell = document.createElement("td");
   const input = document.createElement("input");
   input.type = type;
   input.value = value;
   input.setAttribute("aria-label", label);
+  const cellAttributes = { ...attributes };
+  delete cellAttributes.testid;
+  applyDataset(cell, cellAttributes);
+  applyDataset(input, attributes);
 
   if (type === "number") {
     input.min = "0";
@@ -1136,15 +1184,19 @@ function inputCell(value, label, onInput, type = "text") {
   return cell;
 }
 
-function removeCell(label, onClick) {
+function removeCell(label, onClick, attributes = {}) {
   const cell = document.createElement("td");
   cell.className = "action-cell";
+  const cellAttributes = { ...attributes };
+  delete cellAttributes.testid;
+  applyDataset(cell, cellAttributes);
   const button = document.createElement("button");
   button.className = "icon-button";
   button.type = "button";
   button.textContent = "x";
   button.setAttribute("aria-label", label);
   button.title = label;
+  applyDataset(button, attributes);
   button.addEventListener("click", onClick);
   cell.append(button);
   return cell;
@@ -1160,11 +1212,200 @@ function headerCell(text, className) {
   return cell;
 }
 
-function moneyCell(cents) {
+function moneyCell(cents, attributes = {}) {
   const cell = document.createElement("td");
   cell.className = "numeric";
   cell.textContent = formatMoney(cents);
+  applyDataset(cell, attributes);
   return cell;
 }
 
+function getAutomationMetadata() {
+  const metadataScript = document.querySelector("#automation-metadata");
+  if (!metadataScript) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(metadataScript.textContent);
+  } catch {
+    return {};
+  }
+}
+
+function setActiveBillState(nextState, options = {}) {
+  if (!isValidStoredState(nextState)) {
+    throw new Error("Invalid bill state. Expected { people, items, quantities, fees }.");
+  }
+
+  replaceState(cloneState(nextState));
+  nextId = Number.isInteger(options.nextId) ? options.nextId : getHighestNumericId(state) + 1;
+
+  if (options.name !== undefined) {
+    getActiveBill().name = String(options.name);
+  }
+
+  persistState();
+  render();
+  return getBillSummary();
+}
+
+function clearActiveBill() {
+  replaceState(createEmptyState());
+  nextId = 1;
+  persistState();
+  render();
+  return getBillSummary();
+}
+
+function createHarnessBill(name, billState = createEmptyState()) {
+  if (!isValidStoredState(billState)) {
+    throw new Error("Invalid bill state. Expected { people, items, quantities, fees }.");
+  }
+
+  const bill = createBill(String(name || `Bill ${library.bills.length + 1}`), billState);
+  library.bills.push(bill);
+  switchActiveBill(bill.id);
+  return cloneState(bill);
+}
+
+function renameActiveBill(name) {
+  const bill = getActiveBill();
+  bill.name = String(name);
+  bill.updatedAt = new Date().toISOString();
+  saveLibrary();
+  renderBillLibrary();
+  return cloneState(bill);
+}
+
+function deleteActiveBill() {
+  if (library.bills.length <= 1) {
+    throw new Error("Cannot delete the only saved bill.");
+  }
+
+  const deletedBillId = activeBillId;
+  const index = library.bills.findIndex((bill) => bill.id === deletedBillId);
+  library.bills = library.bills.filter((bill) => bill.id !== deletedBillId);
+  switchActiveBill((library.bills[Math.max(0, index - 1)] ?? library.bills[0]).id);
+  return deletedBillId;
+}
+
+function switchBillFromHarness(id) {
+  const billId = String(id);
+  if (!library.bills.some((bill) => bill.id === billId)) {
+    throw new Error(`Unknown bill: ${billId}`);
+  }
+
+  switchActiveBill(billId);
+  return cloneState(getActiveBill());
+}
+
+function addPeopleFromHarness(names) {
+  const parsedNames = Array.isArray(names) ? names.map(String) : parseBatchPeople(String(names ?? ""));
+  const existingNames = new Set(state.people.map((person) => person.name.trim().toLowerCase()).filter(Boolean));
+  const added = [];
+
+  parsedNames.map((name) => name.trim()).filter(Boolean).forEach((name) => {
+    const normalized = name.toLowerCase();
+    if (existingNames.has(normalized)) {
+      return;
+    }
+
+    const person = { id: makeId("person"), name };
+    state.people.push(person);
+    state.quantities[person.id] = {};
+    existingNames.add(normalized);
+    added.push(person);
+  });
+
+  persistState();
+  render();
+  return cloneState(added);
+}
+
+function addItemsFromHarness(items) {
+  const parsedItems = Array.isArray(items)
+    ? items.map((item) => ({ name: String(item.name ?? ""), price: cleanNumber(item.price) })).filter((item) => item.name && item.price > 0)
+    : parseBatchItems(String(items ?? ""));
+  const added = [];
+
+  parsedItems.forEach((item) => {
+    const addedItem = { id: makeId("item"), name: item.name, price: item.price };
+    state.items.push(addedItem);
+    added.push(addedItem);
+  });
+
+  persistState();
+  render();
+  return cloneState(added);
+}
+
+function setQuantityFromHarness(personRef, itemRef, quantity) {
+  const person = resolvePerson(personRef);
+  const item = resolveItem(itemRef);
+  if (!state.quantities[person.id]) {
+    state.quantities[person.id] = {};
+  }
+  state.quantities[person.id][item.id] = cleanNumber(quantity);
+  persistState();
+  render();
+  return getBillSummary();
+}
+
+function setFeeFromHarness(name, amount) {
+  const feeName = String(name || "").trim();
+  if (!feeName) {
+    throw new Error("Fee name is required.");
+  }
+
+  let fee = state.fees.find((entry) => entry.id === feeName || entry.name.toLowerCase() === feeName.toLowerCase());
+  if (!fee) {
+    fee = { id: makeId("fee"), name: feeName, amount: 0 };
+    state.fees.push(fee);
+  }
+  fee.amount = cleanNumber(amount);
+  persistState();
+  render();
+  return cloneState(fee);
+}
+
+function resolvePerson(ref) {
+  const value = String(ref ?? "").trim();
+  const person = state.people.find((entry) => entry.id === value || entry.name.toLowerCase() === value.toLowerCase());
+  if (!person) {
+    throw new Error(`Unknown person: ${value}`);
+  }
+  return person;
+}
+
+function resolveItem(ref) {
+  const value = String(ref ?? "").trim();
+  const item = state.items.find((entry) => entry.id === value || entry.name.toLowerCase() === value.toLowerCase());
+  if (!item) {
+    throw new Error(`Unknown item: ${value}`);
+  }
+  return item;
+}
+
+function installAutomationHarness() {
+  window.BillSplitterHarness = Object.freeze({
+    getState: () => cloneState(state),
+    getLibrary: () => cloneState(library),
+    getSummary: () => cloneState(getBillSummary()),
+    getMetadata: () => cloneState(getAutomationMetadata()),
+    setActiveBillState,
+    resetSample: () => setActiveBillState(SAMPLE_STATE, { name: getActiveBill().name }),
+    clearActiveBill,
+    createBill: createHarnessBill,
+    switchBill: switchBillFromHarness,
+    renameActiveBill,
+    deleteActiveBill,
+    addPeople: addPeopleFromHarness,
+    addItems: addItemsFromHarness,
+    setQuantity: setQuantityFromHarness,
+    setFee: setFeeFromHarness,
+  });
+}
+
+installAutomationHarness();
 render();

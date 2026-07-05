@@ -1,0 +1,68 @@
+{
+  "appName": "Bill Splitter",
+  "purpose": "Split itemized bills by person and allocate final fees proportionally.",
+  "automationVersion": "1.0.0",
+  "entrypoints": {
+    "browserUrl": "http://127.0.0.1:8080/index.html",
+    "harnessGlobal": "window.BillSplitterHarness",
+    "metadataElement": "#automation-metadata",
+    "automationGuide": "AUTOMATION.md",
+    "agentInstructions": "AGENTS.md"
+  },
+  "storageKeys": {
+    "library": "bill-splitter-library-v2",
+    "legacyState": "bill-splitter-state-v1"
+  },
+  "stateSchema": {
+    "people": [{ "id": "string", "name": "string" }],
+    "items": [{ "id": "string", "name": "string", "price": "number" }],
+    "quantities": { "personId": { "itemId": "number" } },
+    "fees": [{ "id": "string", "name": "string", "amount": "number" }]
+  },
+  "selectors": {
+    "appShell": "[data-testid=\"app-shell\"]",
+    "billSelector": "[data-testid=\"bill-selector\"]",
+    "billNameInput": "[data-testid=\"bill-name-input\"]",
+    "peopleTable": "[data-testid=\"people-table\"]",
+    "itemsTable": "[data-testid=\"items-table\"]",
+    "quantityTable": "[data-testid=\"quantity-table\"]",
+    "feesTable": "[data-testid=\"fees-table\"]",
+    "resultsTable": "[data-testid=\"results-table\"]",
+    "personRow": "[data-testid=\"person-row\"]",
+    "itemRow": "[data-testid=\"item-row\"]",
+    "feeRow": "[data-testid=\"fee-row\"]",
+    "quantityInput": "[data-testid=\"quantity-input\"]",
+    "resultCell": "[data-testid=\"result-cell\"]",
+    "resultsTotalRow": "[data-testid=\"results-total-row\"]",
+    "exportBills": "[data-testid=\"export-bills\"]",
+    "exportReceiptsPdf": "[data-testid=\"export-receipts-pdf\"]",
+    "exportReceiptsPng": "[data-testid=\"export-receipts-png\"]",
+    "exportBreakdownPdf": "[data-testid=\"export-breakdown-pdf\"]",
+    "exportSpreadsheet": "[data-testid=\"export-spreadsheet\"]"
+  },
+  "harnessMethods": {
+    "readOnly": ["getState", "getLibrary", "getSummary", "getMetadata"],
+    "stateSetup": ["setActiveBillState", "resetSample", "clearActiveBill"],
+    "billLibrary": ["createBill", "switchBill", "renameActiveBill", "deleteActiveBill"],
+    "batchHelpers": ["addPeople", "addItems", "setQuantity", "setFee"]
+  },
+  "commonWorkflows": {
+    "setUpBill": [
+      "BillSplitterHarness.clearActiveBill()",
+      "BillSplitterHarness.addPeople(['Alice', 'Bob'])",
+      "BillSplitterHarness.addItems([{ name: 'Burger', price: 30 }])",
+      "BillSplitterHarness.setQuantity('Alice', 'Burger', 1)",
+      "BillSplitterHarness.setFee('Service Charge', 5)",
+      "BillSplitterHarness.getSummary()"
+    ],
+    "readGrandTotal": "BillSplitterHarness.getSummary().grandTotal",
+    "queryGrandTotalCell": "[data-testid=\"result-cell\"][data-result-column=\"grand-total\"]"
+  },
+  "exports": {
+    "savedBillsJson": "Full saved-bill library JSON via Export bills.",
+    "receiptPdfZip": "ZIP of individual person PDFs via Receipts (PDF).",
+    "receiptPngZip": "ZIP of individual person PNGs via Receipts (PNG).",
+    "breakdownPdf": "Browser print flow via PDF breakdown.",
+    "spreadsheet": "Excel-compatible .xls download via Excel spreadsheet."
+  }
+}
