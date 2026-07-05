@@ -347,7 +347,19 @@ function renderResults() {
     tbody.append(tr);
   });
 
-  els.resultsTable.append(thead, tbody);
+  const tfoot = document.createElement("tfoot");
+  const totalsRow = document.createElement("tr");
+  const totalsLabel = document.createElement("th");
+  totalsLabel.scope = "row";
+  totalsLabel.textContent = "Totals";
+  totalsRow.append(totalsLabel, moneyCell(summary.purchaseTotal));
+  summary.fees.forEach((fee) => totalsRow.append(moneyCell(fee.amount)));
+  const grandTotalCell = moneyCell(summary.grandTotal);
+  grandTotalCell.classList.add("final-total");
+  totalsRow.append(grandTotalCell);
+  tfoot.append(totalsRow);
+
+  els.resultsTable.append(thead, tbody, tfoot);
 }
 
 function getBillSummary() {

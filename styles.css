@@ -235,6 +235,12 @@ tr:last-child td {
   border-bottom: 0;
 }
 
+tfoot th,
+tfoot td {
+  border-top: 2px solid var(--ink);
+  font-weight: 900;
+}
+
 .action-col {
   width: 76px;
   text-align: center;
