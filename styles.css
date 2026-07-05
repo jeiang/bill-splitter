@@ -28,7 +28,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -97,6 +99,30 @@ h2 {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.bill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.bill-fields {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 2fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.bill-fields label,
+.batch-entry label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .section-note {
@@ -250,7 +276,9 @@ tfoot td {
   text-align: center;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   min-width: 92px;
   padding: 9px 10px;
@@ -260,13 +288,30 @@ input {
   background: var(--input);
 }
 
-input:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: var(--accent);
   outline: 3px solid rgba(15, 118, 110, 0.16);
 }
 
 input[type="number"] {
   text-align: right;
+}
+
+textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.batch-entry {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.batch-entry .button {
+  justify-self: start;
 }
 
 .person-col {
@@ -333,5 +378,14 @@ input[type="number"] {
   .export-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .bill-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .bill-fields {
+    grid-template-columns: 1fr;
   }
 }

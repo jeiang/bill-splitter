@@ -20,6 +20,33 @@
         </div>
       </header>
 
+      <section class="panel wide" aria-labelledby="bill-library-title">
+        <div class="section-heading export-heading">
+          <div>
+            <h2 id="bill-library-title">Saved Bills</h2>
+            <p class="section-note">Name, switch, back up, and restore locally saved bills.</p>
+          </div>
+          <div class="bill-actions" aria-label="Saved bill actions">
+            <button id="newBill" class="button secondary" type="button">New bill</button>
+            <button id="duplicateBill" class="button secondary" type="button">Duplicate</button>
+            <button id="deleteBill" class="button danger" type="button">Delete</button>
+            <button id="exportBills" class="button secondary" type="button">Export bills</button>
+            <button id="importBills" class="button" type="button">Import bills</button>
+            <input id="importBillsFile" type="file" accept="application/json,.json" hidden>
+          </div>
+        </div>
+        <div class="bill-fields">
+          <label>
+            <span>Current bill</span>
+            <select id="billSelector"></select>
+          </label>
+          <label>
+            <span>Bill name</span>
+            <input id="billName" type="text" autocomplete="off">
+          </label>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="people-title">
         <div class="section-heading">
           <h2 id="people-title">People</h2>
@@ -35,6 +62,11 @@
             </thead>
             <tbody id="peopleBody"></tbody>
           </table>
+        </div>
+        <div class="batch-entry">
+          <label for="batchPeople">Batch add people</label>
+          <textarea id="batchPeople" rows="3" placeholder="Alice, Bob, Carter"></textarea>
+          <button id="addBatchPeople" class="button secondary" type="button">Add batch</button>
         </div>
       </section>
 
@@ -54,6 +86,11 @@
             </thead>
             <tbody id="itemsBody"></tbody>
           </table>
+        </div>
+        <div class="batch-entry">
+          <label for="batchItems">Batch add items</label>
+          <textarea id="batchItems" rows="3" placeholder="Burger,30&#10;Coke,10"></textarea>
+          <button id="addBatchItems" class="button secondary" type="button">Add batch</button>
         </div>
       </section>
 

@@ -20,10 +20,13 @@ const SAMPLE_STATE = {
   ],
 };
 
-const STORAGE_KEY = "bill-splitter-state-v1";
-const initialState = loadInitialState();
-const state = initialState.state;
-let nextId = initialState.nextId;
+const LEGACY_STORAGE_KEY = "bill-splitter-state-v1";
+const LIBRARY_STORAGE_KEY = "bill-splitter-library-v2";
+const initialLibrary = loadInitialLibrary();
+const library = initialLibrary.library;
+let activeBillId = library.activeBillId;
+const state = cloneState(getActiveBill().state);
+let nextId = getActiveBill().nextId;
 
 const els = {
   peopleBody: document.querySelector("#peopleBody"),
@@ -37,6 +40,18 @@ const els = {
   addPerson: document.querySelector("#addPerson"),
   addItem: document.querySelector("#addItem"),
   addFee: document.querySelector("#addFee"),
+  billSelector: document.querySelector("#billSelector"),
+  billName: document.querySelector("#billName"),
+  newBill: document.querySelector("#newBill"),
+  duplicateBill: document.querySelector("#duplicateBill"),
+  deleteBill: document.querySelector("#deleteBill"),
+  exportBills: document.querySelector("#exportBills"),
+  importBills: document.querySelector("#importBills"),
+  importBillsFile: document.querySelector("#importBillsFile"),
+  batchPeople: document.querySelector("#batchPeople"),
+  addBatchPeople: document.querySelector("#addBatchPeople"),
+  batchItems: document.querySelector("#batchItems"),
+  addBatchItems: document.querySelector("#addBatchItems"),
   resetSample: document.querySelector("#resetSample"),
   clearAll: document.querySelector("#clearAll"),
   exportReceiptPdf: document.querySelector("#exportReceiptPdf"),
@@ -64,6 +79,63 @@ els.addFee.addEventListener("click", () => {
   state.fees.push({ id: makeId("fee"), name: `Fee ${state.fees.length + 1}`, amount: 0 });
   persistState();
   render();
+});
+
+els.billSelector.addEventListener("change", () => {
+  switchActiveBill(els.billSelector.value);
+});
+
+els.billName.addEventListener("input", () => {
+  const bill = getActiveBill();
+  bill.name = els.billName.value;
+  bill.updatedAt = new Date().toISOString();
+  saveLibrary();
+  renderBillSelector();
+});
+
+els.newBill.addEventListener("click", () => {
+  const bill = createBill(`Bill ${library.bills.length + 1}`, createEmptyState());
+  library.bills.push(bill);
+  switchActiveBill(bill.id);
+});
+
+els.duplicateBill.addEventListener("click", () => {
+  const current = getActiveBill();
+  const bill = createBill(`${displayBillName(current)} copy`, cloneState(state), nextId);
+  library.bills.push(bill);
+  switchActiveBill(bill.id);
+});
+
+els.deleteBill.addEventListener("click", () => {
+  if (library.bills.length <= 1) {
+    window.alert("At least one saved bill is required.");
+    return;
+  }
+
+  const index = library.bills.findIndex((bill) => bill.id === activeBillId);
+  library.bills = library.bills.filter((bill) => bill.id !== activeBillId);
+  const nextBill = library.bills[Math.max(0, index - 1)] ?? library.bills[0];
+  switchActiveBill(nextBill.id);
+});
+
+els.exportBills.addEventListener("click", () => {
+  exportBillLibrary();
+});
+
+els.importBills.addEventListener("click", () => {
+  els.importBillsFile.click();
+});
+
+els.importBillsFile.addEventListener("change", () => {
+  importBillLibrary(els.importBillsFile.files?.[0]);
+});
+
+els.addBatchPeople.addEventListener("click", () => {
+  addBatchPeople();
+});
+
+els.addBatchItems.addEventListener("click", () => {
+  addBatchItems();
 });
 
 els.resetSample.addEventListener("click", () => {
@@ -99,27 +171,32 @@ function cloneState(source) {
   return JSON.parse(JSON.stringify(source));
 }
 
-function loadInitialState() {
+function loadInitialLibrary() {
   const fallback = cloneState(SAMPLE_STATE);
 
   try {
-    const stored = window.localStorage?.getItem(STORAGE_KEY);
-    if (!stored) {
-      return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+    const storedLibrary = window.localStorage?.getItem(LIBRARY_STORAGE_KEY);
+    if (storedLibrary) {
+      const parsedLibrary = JSON.parse(storedLibrary);
+      const normalizedLibrary = normalizeLibrary(parsedLibrary);
+      if (normalizedLibrary) {
+        return { library: normalizedLibrary };
+      }
     }
 
-    const parsed = JSON.parse(stored);
-    if (!isValidStoredState(parsed?.state)) {
-      return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+    const storedLegacy = window.localStorage?.getItem(LEGACY_STORAGE_KEY);
+    if (storedLegacy) {
+      const parsedLegacy = JSON.parse(storedLegacy);
+      if (isValidStoredState(parsedLegacy?.state)) {
+        const bill = createBill("Untitled bill", parsedLegacy.state, parsedLegacy.nextId);
+        return { library: { activeBillId: bill.id, bills: [bill] } };
+      }
     }
-
-    return {
-      state: parsed.state,
-      nextId: Number.isInteger(parsed.nextId) ? parsed.nextId : getHighestNumericId(parsed.state) + 1,
-    };
   } catch {
-    return { state: fallback, nextId: getHighestNumericId(fallback) + 1 };
+    return { library: createDefaultLibrary(fallback) };
   }
+
+  return { library: createDefaultLibrary(fallback) };
 }
 
 function isValidStoredState(candidate) {
@@ -134,12 +211,201 @@ function isValidStoredState(candidate) {
   );
 }
 
+function normalizeLibrary(candidate) {
+  if (!candidate || !Array.isArray(candidate.bills) || candidate.bills.length === 0) {
+    return null;
+  }
+
+  const bills = candidate.bills
+    .filter((bill) => bill && isValidStoredState(bill.state))
+    .map((bill) => ({
+      id: String(bill.id || makeStorageId("bill")),
+      name: String(bill.name || "Untitled bill"),
+      updatedAt: String(bill.updatedAt || new Date().toISOString()),
+      state: cloneState(bill.state),
+      nextId: Number.isInteger(bill.nextId) ? bill.nextId : getHighestNumericId(bill.state) + 1,
+    }));
+
+  if (bills.length === 0) {
+    return null;
+  }
+
+  return {
+    activeBillId: bills.some((bill) => bill.id === candidate.activeBillId) ? candidate.activeBillId : bills[0].id,
+    bills,
+  };
+}
+
+function createDefaultLibrary(sourceState) {
+  const bill = createBill("Sample bill", sourceState);
+  return { activeBillId: bill.id, bills: [bill] };
+}
+
+function createBill(name, billState, billNextId = getHighestNumericId(billState) + 1) {
+  return {
+    id: makeStorageId("bill"),
+    name,
+    updatedAt: new Date().toISOString(),
+    state: cloneState(billState),
+    nextId: billNextId,
+  };
+}
+
+function createEmptyState() {
+  return { people: [], items: [], quantities: {}, fees: [] };
+}
+
+function makeStorageId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function persistState() {
+  const bill = getActiveBill();
+  bill.state = cloneState(state);
+  bill.nextId = nextId;
+  bill.updatedAt = new Date().toISOString();
+  saveLibrary();
+}
+
+function saveLibrary() {
   try {
-    window.localStorage?.setItem(STORAGE_KEY, JSON.stringify({ state, nextId }));
+    window.localStorage?.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(library));
   } catch {
     // Storage can be unavailable in private browsing or restricted embeds.
   }
+}
+
+function getActiveBill() {
+  return library.bills.find((bill) => bill.id === activeBillId) ?? library.bills[0];
+}
+
+function switchActiveBill(billId) {
+  const bill = library.bills.find((entry) => entry.id === billId);
+  if (!bill) {
+    return;
+  }
+
+  activeBillId = bill.id;
+  library.activeBillId = bill.id;
+  replaceState(cloneState(bill.state));
+  nextId = Number.isInteger(bill.nextId) ? bill.nextId : getHighestNumericId(state) + 1;
+  saveLibrary();
+  render();
+}
+
+function displayBillName(bill) {
+  return bill.name.trim() || "Untitled bill";
+}
+
+function exportBillLibrary() {
+  persistState();
+  const blob = new Blob([JSON.stringify(library, null, 2)], { type: "application/json;charset=utf-8" });
+  downloadBlob(blob, `bill-splitter-bills-${new Date().toISOString().slice(0, 10)}.json`);
+}
+
+function importBillLibrary(file) {
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const imported = normalizeLibrary(JSON.parse(String(reader.result ?? "")));
+      if (!imported) {
+        throw new Error("Invalid saved bill file.");
+      }
+
+      library.activeBillId = imported.activeBillId;
+      library.bills = imported.bills;
+      activeBillId = imported.activeBillId;
+      const bill = getActiveBill();
+      replaceState(cloneState(bill.state));
+      nextId = bill.nextId;
+      saveLibrary();
+      render();
+    } catch {
+      window.alert("That file is not a valid bill-splitter export.");
+    } finally {
+      els.importBillsFile.value = "";
+    }
+  });
+  reader.addEventListener("error", () => {
+    window.alert("Could not read that file.");
+    els.importBillsFile.value = "";
+  });
+  reader.readAsText(file);
+}
+
+function addBatchPeople() {
+  const names = parseBatchPeople(els.batchPeople.value);
+  if (names.length === 0) {
+    return;
+  }
+
+  const existingNames = new Set(state.people.map((person) => person.name.trim().toLowerCase()).filter(Boolean));
+  let added = 0;
+  names.forEach((name) => {
+    const normalized = name.toLowerCase();
+    if (existingNames.has(normalized)) {
+      return;
+    }
+
+    const person = { id: makeId("person"), name };
+    state.people.push(person);
+    state.quantities[person.id] = {};
+    existingNames.add(normalized);
+    added += 1;
+  });
+
+  if (added > 0) {
+    els.batchPeople.value = "";
+    persistState();
+    render();
+  }
+}
+
+function addBatchItems() {
+  const items = parseBatchItems(els.batchItems.value);
+  if (items.length === 0) {
+    return;
+  }
+
+  items.forEach((item) => {
+    state.items.push({ id: makeId("item"), name: item.name, price: item.price });
+  });
+  els.batchItems.value = "";
+  persistState();
+  render();
+}
+
+function parseBatchPeople(value) {
+  return value
+    .split(/[,\n\r]+/)
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function parseBatchItems(value) {
+  return value
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map(parseItemRow)
+    .filter(Boolean);
+}
+
+function parseItemRow(row) {
+  const columns = row.includes("\t") ? row.split("\t") : row.split(",");
+  const name = columns[0]?.trim();
+  const priceText = columns[1]?.trim();
+  const price = cleanNumber(priceText);
+
+  if (!name || !priceText || price <= 0) {
+    return null;
+  }
+
+  return { name, price };
 }
 
 function getHighestNumericId(source) {
@@ -184,11 +450,28 @@ function formatMoney(cents) {
 }
 
 function render() {
+  renderBillLibrary();
   renderPeople();
   renderItems();
   renderFees();
   renderQuantities();
   renderResults();
+}
+
+function renderBillLibrary() {
+  renderBillSelector();
+  els.billName.value = getActiveBill().name;
+}
+
+function renderBillSelector() {
+  els.billSelector.replaceChildren();
+  library.bills.forEach((bill) => {
+    const option = document.createElement("option");
+    option.value = bill.id;
+    option.textContent = displayBillName(bill);
+    option.selected = bill.id === activeBillId;
+    els.billSelector.append(option);
+  });
 }
 
 function renderPeople() {
