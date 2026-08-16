@@ -18,7 +18,7 @@ const h = window.BillSplitterHarness;
 
 h.clearActiveBill();
 h.addPeople(["Alice", "Bob"]);
-h.addItems([{ name: "Burger", price: 30 }, { name: "Coke", price: 10 }]);
+h.addItems([{ name: "Burger", price: 30, quantity: 2 }, { name: "Coke", price: 10, quantity: 1 }]);
 h.setQuantity("Alice", "Burger", 1);
 h.setQuantity("Bob", "Coke", 2);
 h.setFee("Service Charge", 6);
@@ -51,7 +51,7 @@ Mutating methods persist to localStorage and re-render the page.
 ```js
 {
   people: [{ id: "person-1", name: "Alice" }],
-  items: [{ id: "item-1", name: "Burger", price: 30 }],
+  items: [{ id: "item-1", name: "Burger", price: 30, quantity: 2 }],
   quantities: {
     "person-1": { "item-1": 1 }
   },

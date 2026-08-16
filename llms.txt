@@ -30,4 +30,4 @@ Core harness workflow:
 3. Use stable selectors only when validating visible UI or clicking export buttons.
 
 The state shape is:
-`{ people: [{ id, name }], items: [{ id, name, price }], quantities: { [personId]: { [itemId]: quantity } }, fees: [{ id, name, amount }] }`
+`{ people: [{ id, name }], items: [{ id, name, price, quantity }], quantities: { [personId]: { [itemId]: quantity } }, fees: [{ id, name, amount }] }`

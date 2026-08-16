@@ -337,6 +337,12 @@ textarea {
   font-weight: 900;
 }
 
+.mismatch {
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-weight: 700;
+}
+
 .empty-state {
   margin-top: 14px;
   padding: 16px;

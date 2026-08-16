@@ -15,7 +15,7 @@
   },
   "stateSchema": {
     "people": [{ "id": "string", "name": "string" }],
-    "items": [{ "id": "string", "name": "string", "price": "number" }],
+    "items": [{ "id": "string", "name": "string", "price": "number", "quantity": "number" }],
     "quantities": { "personId": { "itemId": "number" } },
     "fees": [{ "id": "string", "name": "string", "amount": "number" }]
   },
@@ -31,7 +31,9 @@
     "personRow": "[data-testid=\"person-row\"]",
     "itemRow": "[data-testid=\"item-row\"]",
     "feeRow": "[data-testid=\"fee-row\"]",
+    "itemQuantityInput": "[data-testid=\"item-quantity-input\"]",
     "quantityInput": "[data-testid=\"quantity-input\"]",
+    "assignedCell": "[data-testid=\"assigned-cell\"]",
     "resultCell": "[data-testid=\"result-cell\"]",
     "resultsTotalRow": "[data-testid=\"results-total-row\"]",
     "exportBills": "[data-testid=\"export-bills\"]",
@@ -50,7 +52,7 @@
     "setUpBill": [
       "BillSplitterHarness.clearActiveBill()",
       "BillSplitterHarness.addPeople(['Alice', 'Bob'])",
-      "BillSplitterHarness.addItems([{ name: 'Burger', price: 30 }])",
+      "BillSplitterHarness.addItems([{ name: 'Burger', price: 30, quantity: 2 }])",
       "BillSplitterHarness.setQuantity('Alice', 'Burger', 1)",
       "BillSplitterHarness.setFee('Service Charge', 5)",
       "BillSplitterHarness.getSummary()"
