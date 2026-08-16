@@ -5,9 +5,9 @@ const SAMPLE_STATE = {
     { id: "person-3", name: "Carter" },
   ],
   items: [
-    { id: "item-1", name: "Sandwich", price: 20 },
-    { id: "item-2", name: "Burger", price: 30 },
-    { id: "item-3", name: "Coke", price: 10 },
+    { id: "item-1", name: "Sandwich", price: 20, quantity: 1 },
+    { id: "item-2", name: "Burger", price: 30, quantity: 2 },
+    { id: "item-3", name: "Coke", price: 10, quantity: 2 },
   ],
   quantities: {
     "person-1": { "item-1": 1, "item-2": 0, "item-3": 0 },
@@ -26,6 +26,7 @@ const initialLibrary = loadInitialLibrary();
 const library = initialLibrary.library;
 let activeBillId = library.activeBillId;
 const state = cloneState(getActiveBill().state);
+normalizeItemQuantities(state);
 let nextId = getActiveBill().nextId;
 
 const els = {
@@ -70,7 +71,7 @@ els.addPerson.addEventListener("click", () => {
 });
 
 els.addItem.addEventListener("click", () => {
-  state.items.push({ id: makeId("item"), name: `Item ${state.items.length + 1}`, price: 0 });
+  state.items.push({ id: makeId("item"), name: `Item ${state.items.length + 1}`, price: 0, quantity: 1 });
   persistState();
   render();
 });
@@ -372,7 +373,7 @@ function addBatchItems() {
   }
 
   items.forEach((item) => {
-    state.items.push({ id: makeId("item"), name: item.name, price: item.price });
+    state.items.push({ id: makeId("item"), name: item.name, price: item.price, quantity: item.quantity });
   });
   els.batchItems.value = "";
   persistState();
@@ -405,7 +406,7 @@ function parseItemRow(row) {
     return null;
   }
 
-  return { name, price };
+  return { name, price, quantity: cleanNumber(columns[2]) || 1 };
 }
 
 function getHighestNumericId(source) {
@@ -426,6 +427,21 @@ function replaceState(nextState) {
   state.items = nextState.items;
   state.quantities = nextState.quantities;
   state.fees = nextState.fees;
+  normalizeItemQuantities(state);
+}
+
+function assignedTotal(source, itemId) {
+  return Object.values(source.quantities)
+    .reduce((sum, personQuantities) => sum + cleanNumber(personQuantities[itemId] ?? 0), 0);
+}
+
+function normalizeItemQuantities(source) {
+  source.items.forEach((item) => {
+    if (!Number.isFinite(item.quantity)) {
+      // ponytail: legacy bills lack purchased quantities; default to what's assigned so they load without warnings
+      item.quantity = assignedTotal(source, item.id) || 1;
+    }
+  });
 }
 
 function makeId(prefix) {
@@ -518,6 +534,11 @@ function renderItems() {
         persistState();
         renderResults();
       }, "number", { testid: "item-price-input", itemId: item.id }),
+      inputCell(item.quantity, "Quantity purchased", (value) => {
+        item.quantity = cleanNumber(value);
+        persistState();
+        updateAssignedTotals();
+      }, "number", { testid: "item-quantity-input", itemId: item.id }),
       removeCell("Remove item", () => {
         state.items = state.items.filter((entry) => entry.id !== item.id);
         Object.values(state.quantities).forEach((personQuantities) => {
@@ -594,6 +615,7 @@ function renderQuantities() {
         }
         state.quantities[person.id][item.id] = cleanNumber(value);
         persistState();
+        updateAssignedTotals();
         renderResults();
       }, "number", {
         testid: "quantity-input",
@@ -605,7 +627,44 @@ function renderQuantities() {
     tbody.append(row);
   });
 
-  els.quantityTable.append(thead, tbody);
+  const tfoot = document.createElement("tfoot");
+  const footRow = document.createElement("tr");
+  footRow.dataset.testid = "assigned-total-row";
+  const footLabel = document.createElement("th");
+  footLabel.scope = "row";
+  footLabel.textContent = "Assigned / purchased";
+  footRow.append(footLabel);
+  assignedCells = {};
+  state.items.forEach((item) => {
+    const cell = document.createElement("td");
+    cell.dataset.testid = "assigned-cell";
+    cell.dataset.itemId = item.id;
+    assignedCells[item.id] = cell;
+    footRow.append(cell);
+  });
+  tfoot.append(footRow);
+
+  els.quantityTable.append(thead, tbody, tfoot);
+  updateAssignedTotals();
+}
+
+let assignedCells = {};
+
+function updateAssignedTotals() {
+  state.items.forEach((item) => {
+    const cell = assignedCells[item.id];
+    if (!cell) {
+      return;
+    }
+
+    const assigned = assignedTotal(state, item.id);
+    const purchased = cleanNumber(item.quantity);
+    cell.textContent = `${formatQuantity(assigned)} / ${formatQuantity(purchased)}`;
+    cell.classList.toggle("mismatch", assigned !== purchased);
+    cell.title = assigned === purchased
+      ? "Assigned quantities match the purchased quantity."
+      : "Assigned quantities do not add up to the purchased quantity.";
+  });
 }
 
 function renderResults() {
@@ -1325,12 +1384,12 @@ function addPeopleFromHarness(names) {
 
 function addItemsFromHarness(items) {
   const parsedItems = Array.isArray(items)
-    ? items.map((item) => ({ name: String(item.name ?? ""), price: cleanNumber(item.price) })).filter((item) => item.name && item.price > 0)
+    ? items.map((item) => ({ name: String(item.name ?? ""), price: cleanNumber(item.price), quantity: cleanNumber(item.quantity) || 1 })).filter((item) => item.name && item.price > 0)
     : parseBatchItems(String(items ?? ""));
   const added = [];
 
   parsedItems.forEach((item) => {
-    const addedItem = { id: makeId("item"), name: item.name, price: item.price };
+    const addedItem = { id: makeId("item"), name: item.name, price: item.price, quantity: item.quantity };
     state.items.push(addedItem);
     added.push(addedItem);
   });

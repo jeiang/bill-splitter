@@ -51,7 +51,10 @@
           "personRow": "person-row",
           "itemRow": "item-row",
           "feeRow": "fee-row",
+          "itemQuantityInput": "item-quantity-input",
           "quantityInput": "quantity-input",
+          "assignedTotalRow": "assigned-total-row",
+          "assignedCell": "assigned-cell",
           "resultCell": "result-cell",
           "resultsTotalRow": "results-total-row",
           "exportBills": "export-bills",
@@ -137,6 +140,7 @@
               <tr>
                 <th scope="col">Item</th>
                 <th scope="col">Unit price</th>
+                <th scope="col">Qty purchased</th>
                 <th class="action-col" scope="col">Remove</th>
               </tr>
             </thead>
@@ -145,7 +149,7 @@
         </div>
         <div class="batch-entry">
           <label for="batchItems">Batch add items</label>
-          <textarea id="batchItems" rows="3" placeholder="Burger,30&#10;Coke,10" data-testid="batch-items-input"></textarea>
+          <textarea id="batchItems" rows="3" placeholder="Burger,30,2&#10;Coke,10" data-testid="batch-items-input"></textarea>
           <button id="addBatchItems" class="button secondary" type="button" data-testid="add-batch-items">Add batch</button>
         </div>
       </section>
